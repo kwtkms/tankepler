@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Données capteurs (CSV)</title>
+  <link rel="stylesheet" href="/static/style.css">
+
+  <style>
+    .tools{
+      display:flex; gap:12px; flex-wrap:wrap;
+      align-items:center; justify-content:space-between;
+      margin: 10px 0 14px;
+    }
+    .tools-left{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .search{
+      min-width: 240px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      outline: none;
+    }
+    .pill{
+      font-size: 12px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+    }
+
+    .table-wrap{
+      overflow:auto;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.02);
+    }
+    table{ width:100%; border-collapse: collapse; min-width: 860px; }
+    th, td{
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    th{
+      text-align:left;
+      position: sticky;
+      top: 0;
+      background: rgba(20, 22, 34, 0.86);
+      backdrop-filter: blur(10px);
+      z-index: 1;
+    }
+    tr:hover td{ background: rgba(255,255,255,0.03); }
+
+    .pager{
+      margin-top: 14px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:space-between;
+      align-items:center;
+    }
+    .pager .left, .pager .right{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    }
+    .select{
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid var(--stroke);
+    background: rgba(20, 22, 34, 0.86);
+    color: var(--text);
+    }
+    .select option{
+    background: #0b0f1a; /* fond sombre */
+    color: var(--text);
+    }
+
+    .mini{
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg-grid"></div>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">📄</div>
+      <div>
+        <div class="title">Données capteurs (CSV)</div>
+        <div class="subtitle" id="subtitle">Chargement…</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a class="btn secondary" href="/" style="text-decoration:none;">⬅ Retour</a>
+      <a class="btn" href="/download-csv" style="text-decoration:none;">⬇ Télécharger CSV</a>
+      <button class="btn secondary" id="btnRefresh">🔄 Rafraîchir</button>
+    </div>
+  </header>
+
+  <main class="container" style="grid-template-columns: 1fr;">
+    <section class="card">
+      <div class="card-header">
+        <h2>Tableau</h2>
+        <div class="hint">Données capteurs</div>
+
+      </div>
+
+      <div class="tools">
+        <div class="tools-left">
+        <input id="search" class="search" placeholder="Rechercher (ex: 23.2 ou 2026-01-22)">
+
+        <span class="pill" id="livePill">Auto-refresh: —</span>
+
+        <label class="pill" style="display:flex; gap:8px; align-items:center; cursor:pointer;">
+            <input id="auto" type="checkbox" checked />
+            Auto
+        </label>
+        </div>
+
+        <div class="tools-left">
+          <span class="mini" id="countInfo">—</span>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr id="thead"></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <div class="left">
+          <button class="btn secondary" id="prev">← Précédent</button>
+          <button class="btn secondary" id="next">Suivant →</button>
+          <span class="mini" id="pageInfo">Page —</span>
+        </div>
+
+        <div class="right">
+          <span class="mini">Lignes par page</span>
+          <select id="pageSize" class="select">
+            <option value="10">10</option>
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ------- State -------
+    const HIDE_COLS = new Set(["ts"]); // colonnes présentes mais cachées
+    const COL_LABELS = {
+    "date_time": "🕒 Date",
+    "temperature_c": "🌡️ Température (°C)",
+    "humidity_pct": "💧 Humidité (%)",
+    "pressure_hpa": "📈 Pression (hPa)",
+    "lux": "💡 Luminosité (lux)",
+    };
+
+    let visibleHeaders = [];
+    let visibleColIdx = [];
+
+    let headers = [];
+    let rows = [];
+    let filtered = [];
+    let page = 1;
+    let pageSize = 25;
+
+    let refreshSec = 5;     // sera remplacé par le serveur
+    let autoTimer = null;
+
+    const autoEl = document.getElementById("auto");
+    const livePillEl = document.getElementById("livePill");
+
+    let displayRows = [];      // ce qu'on affiche vraiment
+    let pendingRows = [];      // nouvelles lignes à ajouter progressivement
+    let lastSeenTs = null;     // pour détecter les nouvelles lignes
+    let dripTimer = null;
+
+    const DRIP_INTERVAL_MS = 800; // vitesse d'affichage des nouvelles lignes (modifiable)
+
+    // ------- Elements -------
+    const theadEl = document.getElementById("thead");
+    const tbodyEl = document.getElementById("tbody");
+    const subtitleEl = document.getElementById("subtitle");
+    const countInfoEl = document.getElementById("countInfo");
+    const pageInfoEl = document.getElementById("pageInfo");
+    const searchEl = document.getElementById("search");
+    const btnRefresh = document.getElementById("btnRefresh");
+    const prevBtn = document.getElementById("prev");
+    const nextBtn = document.getElementById("next");
+    const pageSizeEl = document.getElementById("pageSize");
+
+    // ------- Utils -------
+    function escapeHtml(s){
+      return String(s)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function applyFilter(){
+    const q = (searchEl.value || "").trim().toLowerCase();
+    if (!q){
+        filtered = displayRows.slice();
+    } else {
+        filtered = displayRows.filter(r => r.some(cell => String(cell).toLowerCase().includes(q)));
+    }
+    render();
+    }
+
+
+    function render(){
+    // Colonnes visibles (on calcule les index)
+    visibleHeaders = [];
+    visibleColIdx = [];
+    headers.forEach((h, idx) => {
+        if (!HIDE_COLS.has(String(h))) {
+        visibleHeaders.push(h);
+        visibleColIdx.push(idx);
+        }
+    });
+
+    // header
+    theadEl.innerHTML = visibleHeaders
+    .map(h => `<th>${escapeHtml(COL_LABELS[h] || h)}</th>`)
+    .join("");
+
+
+    // pagination
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    page = Math.min(page, totalPages);
+
+    const start = (page - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    // body (on n'affiche que les colonnes visibles)
+    tbodyEl.innerHTML = pageRows.map(r => {
+        const tds = visibleColIdx.map(i => `<td>${escapeHtml(r[i])}</td>`).join("");
+        return `<tr>${tds}</tr>`;
+    }).join("");
+
+    pageInfoEl.textContent = `Page ${page} / ${totalPages}`;
+    countInfoEl.textContent = `Affiché: ${pageRows.length} — Total (filtré): ${total} — Total (CSV): ${rows.length}`;
+
+    prevBtn.disabled = (page <= 1);
+    nextBtn.disabled = (page >= totalPages);
+    }
+
+
+async function fetchData(){
+  try{
+    const res = await fetch("/data.json", { cache: "no-store" });
+    const data = await res.json();
+
+    if (!data.ok){
+      subtitleEl.textContent = data.error || "Erreur";
+      headers = [];
+      rows = [];
+      filtered = [];
+      render();
+      return;
+    }
+
+    // refresh serveur (uniquement quand ok)
+    refreshSec = Number(data.refresh_sec || 5);
+    livePillEl.textContent = `Auto-refresh: ${refreshSec}s • ${new Date().toLocaleTimeString("fr-FR")}`;
+
+    const incoming = (data.rows || []).slice().reverse();
+    rows = incoming;
+    headers = data.headers || [];
+
+    const tsIdx = headers.indexOf("ts");
+
+    if (tsIdx === -1) {
+      displayRows = incoming;
+      pendingRows = [];
+      lastSeenTs = null;
+      applyFilter();
+      return;
+    }
+
+    let newOnes = [];
+    for (const r of incoming) {
+      const tsVal = Number(r[tsIdx]);
+      if (lastSeenTs === null || tsVal > lastSeenTs) {
+        newOnes.push(r);
+      }
+    }
+
+    const already = new Set(displayRows.map(r => r[tsIdx]));
+    for (const r of pendingRows) already.add(r[tsIdx]);
+    newOnes = newOnes.filter(r => !already.has(r[tsIdx]));
+
+    if (incoming.length > 0) {
+      lastSeenTs = Math.max(
+        ...incoming.map(r => Number(r[tsIdx]) || 0),
+        lastSeenTs || 0
+      );
+    }
+
+    newOnes.sort((a,b) => Number(a[tsIdx]) - Number(b[tsIdx]));
+    pendingRows.push(...newOnes);
+
+    subtitleEl.textContent = `Affichage (${displayRows.length} lignes) — en attente: ${pendingRows.length}`;
+    startDrip();
+
+  } catch(e){
+    subtitleEl.textContent = "Erreur de connexion à /data.json";
+  }
+}
+
+function stopAuto(){
+  if (autoTimer){
+    clearTimeout(autoTimer);
+    autoTimer = null;
+  }
+}
+
+function startAuto(){
+  stopAuto();
+  if (!autoEl.checked) return;
+
+  const ms = Math.max(1, Number(refreshSec || 5)) * 1000;
+
+  autoTimer = setTimeout(async () => {
+    await fetchData(); // refreshSec peut changer -> on le relit ici
+    startAuto();
+  }, ms);
+}
+
+function stopDrip(){
+  if (dripTimer){
+    clearInterval(dripTimer);
+    dripTimer = null;
+  }
+}
+
+function startDrip(){
+  if (dripTimer) return;
+
+  dripTimer = setInterval(() => {
+    if (pendingRows.length === 0){
+      stopDrip();
+      return;
+    }
+
+    // On ajoute 1 ligne à displayRows (au début car on veut récent->ancien en haut)
+    const row = pendingRows.shift();
+    displayRows.unshift(row);
+
+    // limite (optionnel) pour éviter trop de RAM
+    const MAX_DISPLAY = 500;
+    if (displayRows.length > MAX_DISPLAY) displayRows = displayRows.slice(0, MAX_DISPLAY);
+
+    applyFilter(); // re-render
+  }, DRIP_INTERVAL_MS);
+}
+
+// ------- Events -------
+searchEl.addEventListener("input", applyFilter);
+
+autoEl.addEventListener("change", () => {
+  if (autoEl.checked) startAuto();
+  else stopAuto();
+});
+
+btnRefresh.addEventListener("click", async () => {
+  await fetchData();
+  if (autoEl.checked) startAuto();
+});
+
+
+prevBtn.addEventListener("click", () => { page = Math.max(1, page - 1); render(); });
+nextBtn.addEventListener("click", () => { page = page + 1; render(); });
+
+pageSizeEl.addEventListener("change", () => {
+  pageSize = Number(pageSizeEl.value);
+  page = 1;
+  render();
+});
+
+// ------- Init -------
+(async () => {
+  pageSize = Number(pageSizeEl.value);
+  await fetchData();
+  startAuto();
+
+  // premier affichage : on met tout direct (sinon tu attends le drip)
+  if (displayRows.length === 0 && pendingRows.length > 0) {
+    displayRows = pendingRows.slice().reverse(); // récent en haut
+    pendingRows = [];
+    applyFilter();
+
+    // IMPORTANT: on fixe lastSeenTs sur ce qu'on vient d'afficher
+    const tsIdx = headers.indexOf("ts");
+    if (tsIdx !== -1 && displayRows.length > 0) {
+      lastSeenTs = Math.max(...displayRows.map(r => Number(r[tsIdx]) || 0));
+    }
+  }
+})();
+
+
+  </script>
+</body>
+</html>

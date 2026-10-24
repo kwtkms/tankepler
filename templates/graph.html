@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Graphes capteurs</title>
+  <link rel="stylesheet" href="/static/style.css">
+
+  <style>
+    .grid-one{ grid-template-columns: 1fr !important; }
+    .chart-wrap{
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.03);
+      padding: 12px;
+      overflow: hidden;
+    }
+    canvas{ width:100%; height:420px; display:block; }
+    .toolbar{
+      display:flex; gap:12px; flex-wrap:wrap;
+      align-items:center; justify-content:space-between;
+      margin: 10px 0 14px;
+    }
+    .select, .input{
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--stroke);
+      background: rgba(20, 22, 34, 0.86);
+      color: var(--text);
+      outline: none;
+    }
+    .select option{
+      background:#0b0f1a;
+      color: var(--text);
+    }
+    .pill{
+      font-size: 12px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+    }
+    .mini{ font-size: 12px; color: rgba(255,255,255,0.75); }
+  </style>
+</head>
+
+<body>
+  <div class="bg-grid"></div>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">📈</div>
+      <div>
+        <div class="title">Graphes capteurs</div>
+        <div class="subtitle" id="subtitle">Chargement…</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a class="btn secondary" href="/" style="text-decoration:none;">⬅ Retour</a>
+      <a class="btn secondary" href="/data" style="text-decoration:none;">📄 Tableau</a>
+      <button class="btn secondary" id="btnRefresh">🔄 Rafraîchir</button>
+    </div>
+  </header>
+
+  <main class="container grid-one">
+    <section class="card">
+      <div class="card-header">
+        <h2>Courbe</h2>
+        <div class="hint">Basé sur le CSV via /data.json (x = ts)</div>
+      </div>
+
+      <div class="toolbar">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <select id="metric" class="select">
+            <option value="temperature_c">🌡️ Température (°C)</option>
+            <option value="humidity_pct">💧 Humidité (%)</option>
+            <option value="pressure_hpa">📈 Pression (hPa)</option>
+            <option value="lux">💡 Luminosité (lux)</option>
+          </select>
+
+          <select id="window" class="select">
+            <option value="50">50 points</option>
+            <option value="100" selected>100 points</option>
+            <option value="200">200 points</option>
+            <option value="500">500 points</option>
+          </select>
+
+          <span class="pill" id="autoPill">Auto-refresh: —</span>
+          <label class="pill" style="display:flex; gap:8px; align-items:center; cursor:pointer;">
+            <input id="auto" type="checkbox" checked />
+            Auto
+          </label>
+        </div>
+
+        <div class="mini" id="info">—</div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="chart" width="1200" height="420"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let headers = [];
+    let rows = [];
+    let refreshSec = 5;
+    let timer = null;
+
+    const subtitleEl = document.getElementById("subtitle");
+    const infoEl = document.getElementById("info");
+    const autoPill = document.getElementById("autoPill");
+    const autoEl = document.getElementById("auto");
+    const metricEl = document.getElementById("metric");
+    const windowEl = document.getElementById("window");
+    const btnRefresh = document.getElementById("btnRefresh");
+
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
+
+    function stopAuto(){
+      if (timer){ clearTimeout(timer); timer = null; }
+    }
+    function startAuto(){
+      stopAuto();
+      if (!autoEl.checked) return;
+      const ms = Math.max(1, Number(refreshSec || 5)) * 1000;
+      timer = setTimeout(async () => {
+        await fetchData();
+        startAuto();
+      }, ms);
+    }
+
+    function idxOf(name){
+      return headers.indexOf(name);
+    }
+
+    function toNum(x){
+      const n = Number(x);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function drawLineChart(points, label){
+      // points: [{t:number, y:number}]
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // padding
+      const padL = 60, padR = 20, padT = 20, padB = 40;
+      const iw = w - padL - padR;
+      const ih = h - padT - padB;
+
+      if (!points.length){
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = "16px system-ui";
+        ctx.fillText("Aucune donnée à afficher.", padL, padT + 24);
+        return;
+      }
+
+      const tMin = Math.min(...points.map(p => p.t));
+      const tMax = Math.max(...points.map(p => p.t));
+      let yMin = Math.min(...points.map(p => p.y));
+      let yMax = Math.max(...points.map(p => p.y));
+
+      // éviter yMin==yMax
+      if (yMin === yMax){
+        yMin -= 1;
+        yMax += 1;
+      }
+
+      // fond
+      ctx.fillStyle = "rgba(255,255,255,0.02)";
+      ctx.fillRect(padL, padT, iw, ih);
+
+      // axes
+      ctx.strokeStyle = "rgba(255,255,255,0.16)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL, padT);
+      ctx.lineTo(padL, padT + ih);
+      ctx.lineTo(padL + iw, padT + ih);
+      ctx.stroke();
+
+      // graduations Y
+      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.font = "12px system-ui";
+      const ticks = 5;
+      for (let i = 0; i <= ticks; i++){
+        const y = padT + (ih * i / ticks);
+        const v = yMax - (yMax - yMin) * (i / ticks);
+        ctx.strokeStyle = "rgba(255,255,255,0.08)";
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(padL + iw, y);
+        ctx.stroke();
+        ctx.fillText(v.toFixed(2), 8, y + 4);
+      }
+
+      // fonction mapping
+      const xOf = (t) => padL + ( (t - tMin) / (tMax - tMin) ) * iw;
+      const yOf = (y) => padT + (1 - ( (y - yMin) / (yMax - yMin) )) * ih;
+
+      // courbe
+      ctx.strokeStyle = "rgba(124,92,255,0.95)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      points.forEach((p, i) => {
+        const x = xOf(p.t);
+        const y = yOf(p.y);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // points (petits)
+      ctx.fillStyle = "rgba(46,242,255,0.85)";
+      points.forEach((p) => {
+        const x = xOf(p.t);
+        const y = yOf(p.y);
+        ctx.beginPath();
+        ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // label
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "14px system-ui";
+      ctx.fillText(label, padL, padT - 4);
+
+      // affichage temps début/fin
+      const leftTime = new Date(tMin * 1000).toLocaleTimeString("fr-FR");
+      const rightTime = new Date(tMax * 1000).toLocaleTimeString("fr-FR");
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = "12px system-ui";
+      ctx.fillText(leftTime, padL, padT + ih + 26);
+      ctx.fillText(rightTime, padL + iw - ctx.measureText(rightTime).width, padT + ih + 26);
+    }
+
+    async function fetchData(){
+      try{
+        const res = await fetch("/data.json", { cache: "no-store" });
+        const data = await res.json();
+        if (!data.ok){
+          subtitleEl.textContent = data.error || "Erreur";
+          return;
+        }
+
+        headers = data.headers || [];
+        rows = data.rows || [];
+        refreshSec = Number(data.refresh_sec || 5);
+        autoPill.textContent = `Auto-refresh: ${refreshSec}s • ${new Date().toLocaleTimeString("fr-FR")}`;
+
+        // tri décroissant par ts si présent (robuste)
+        const tsIdx = idxOf("ts");
+        if (tsIdx >= 0){
+          rows.sort((a,b) => Number(b[tsIdx]) - Number(a[tsIdx]));
+        }
+
+        const metric = metricEl.value;
+        const mIdx = idxOf(metric);
+
+        // fenêtres (dernier N points)
+        const N = Number(windowEl.value || 100);
+        const slice = rows.slice(0, N).reverse(); // on remet chronologique pour dessiner
+
+        const pts = [];
+        if (tsIdx >= 0 && mIdx >= 0){
+          for (const r of slice){
+            const t = toNum(r[tsIdx]);
+            const y = toNum(r[mIdx]);
+            if (t !== null && y !== null){
+              pts.push({ t, y });
+            }
+          }
+        }
+
+        const labelMap = {
+          temperature_c: "🌡️ Température (°C)",
+          humidity_pct: "💧 Humidité (%)",
+          pressure_hpa: "📈 Pression (hPa)",
+          lux: "💡 Luminosité (lux)",
+        };
+
+        subtitleEl.textContent = `Points: ${pts.length} — fenêtre: ${N} — auto-refresh = ${refreshSec}s`;
+        infoEl.textContent = `Capteur: ${labelMap[metric] || metric}`;
+
+        drawLineChart(pts, labelMap[metric] || metric);
+
+      } catch(e){
+        subtitleEl.textContent = "Erreur de connexion à /data.json";
+      }
+    }
+
+    // events
+    btnRefresh.addEventListener("click", fetchData);
+    metricEl.addEventListener("change", fetchData);
+    windowEl.addEventListener("change", fetchData);
+    autoEl.addEventListener("change", () => autoEl.checked ? startAuto() : stopAuto());
+
+    // init
+    (async () => {
+      await fetchData();
+      startAuto();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,503 @@
+:root{
+  --bg: #07090f;
+  --card: rgba(255,255,255,0.06);
+  --stroke: rgba(255,255,255,0.10);
+  --text: rgba(255,255,255,0.92);
+  --muted: rgba(255,255,255,0.65);
+  --accent: #7c5cff;
+  --accent2: #2ef2ff;
+  --danger: #ff4d6d;
+  --shadow: 0 18px 60px rgba(0,0,0,0.55);
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  background: radial-gradient(1200px 600px at 20% 10%, rgba(124,92,255,0.18), transparent 60%),
+              radial-gradient(900px 500px at 80% 30%, rgba(46,242,255,0.10), transparent 55%),
+              var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+/* Background decorations */
+.bg-grid{
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  opacity: 0.12;
+  pointer-events:none;
+  mask-image: radial-gradient(circle at 50% 35%, black 0%, transparent 70%);
+}
+.glow{
+  position:fixed;
+  width:520px; height:520px;
+  border-radius: 999px;
+  filter: blur(60px);
+  opacity: 0.22;
+  pointer-events:none;
+}
+.glow-1{ left:-120px; top:-140px; background: var(--accent); }
+.glow-2{ right:-140px; top:120px; background: var(--accent2); }
+
+.topbar{
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  padding: 18px 18px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+}
+.logo{
+  width:44px; height:44px;
+  display:grid; place-items:center;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.title{ font-size: 18px; font-weight: 700; letter-spacing: 0.2px; }
+.subtitle{ font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+.icon-btn{
+  width:44px; height:44px;
+  border-radius: 14px;
+  border: 1px solid var(--stroke);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  cursor:pointer;
+  box-shadow: var(--shadow);
+  display:grid; place-items:center;
+  transition: transform .12s ease, background .12s ease;
+}
+.icon-btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,0.10); }
+.gear{ font-size: 18px; }
+
+.container{
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 18px 28px;
+  display:grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 16px;
+}
+@media (max-width: 900px){
+  .container{ grid-template-columns: 1fr; }
+}
+
+.card{
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.card-header{
+  display:flex;
+  align-items:flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+h2{
+  margin:0;
+  font-size: 16px;
+  letter-spacing: 0.2px;
+}
+.hint{
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.controls{
+  display:grid;
+  grid-template-areas:
+    ". up ."
+    "left stop right"
+    ". down .";
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+  user-select:none;
+}
+
+.ctrl-btn{
+  height: 84px;
+  border-radius: 16px;
+  border: 1px solid var(--stroke);
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  font-size: 26px;
+  cursor:pointer;
+  transition: transform .08s ease, background .12s ease, border-color .12s ease;
+}
+.ctrl-btn:hover{ background: rgba(255,255,255,0.12); transform: translateY(-1px); }
+.ctrl-btn:active{ transform: translateY(1px) scale(0.99); }
+
+.ctrl-btn.up{ grid-area: up; }
+.ctrl-btn.down{ grid-area: down; }
+.ctrl-btn.left{ grid-area: left; }
+.ctrl-btn.right{ grid-area: right; }
+.ctrl-btn.stop{
+  grid-area: stop;
+  background: rgba(255,77,109,0.15);
+  border-color: rgba(255,77,109,0.35);
+}
+.ctrl-btn.stop:hover{ background: rgba(255,77,109,0.22); }
+
+.status-row{
+  display:flex;
+  gap: 10px;
+  align-items:center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.badge{
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+}
+
+.status{
+  flex:1;
+  text-align:right;
+  font-size: 12px;
+  color: var(--muted);
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keys-preview{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.keypill{
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--stroke);
+  background: rgba(255,255,255,0.05);
+  border-radius: 999px;
+  color: var(--muted);
+}
+.keypill b{ color: var(--text); }
+
+.tips{
+  margin-top: 12px;
+  display:grid;
+  gap: 6px;
+}
+.tip{
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.speed{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+}
+.speed input[type="range"]{
+  width: 100%;
+}
+.speed-value{
+  min-width: 54px;
+  text-align:right;
+  font-weight: 700;
+}
+.small{
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Modal */
+.modal-backdrop{
+  position:fixed; inset:0;
+  background: rgba(0,0,0,0.55);
+  opacity:0;
+  pointer-events:none;
+  transition: opacity .15s ease;
+}
+.modal-backdrop.open{
+  opacity:1;
+  pointer-events:auto;
+}
+
+.modal{
+  position: fixed;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%) scale(0.98);
+  width: min(520px, calc(100vw - 24px));
+  border-radius: 18px;
+  background: rgba(20, 22, 34, 0.86);
+  border: 1px solid var(--stroke);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  opacity:0;
+  pointer-events:none;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.modal.open{
+  opacity:1;
+  pointer-events:auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+.modal-header{
+  padding: 14px 14px 8px;
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.modal-header h3{
+  margin:0;
+  font-size: 14px;
+}
+.modal-body{
+  padding: 12px 14px 14px;
+}
+
+.mapping{
+  margin-top: 10px;
+  display:grid;
+  gap: 10px;
+}
+.mapping .row{
+  display:grid;
+  grid-template-columns: 1fr auto;
+  align-items:center;
+  gap: 10px;
+}
+.mapping label{
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.keybox{
+  min-width: 140px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--stroke);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  cursor:pointer;
+  text-align:center;
+  transition: background .12s ease, transform .08s ease, border-color .12s ease;
+}
+.keybox:hover{ background: rgba(255,255,255,0.10); transform: translateY(-1px); }
+.keybox.listening{
+  border-color: rgba(124,92,255,0.55);
+  box-shadow: 0 0 0 3px rgba(124,92,255,0.18);
+}
+
+.modal-actions{
+  margin-top: 14px;
+  display:flex;
+  gap: 10px;
+  justify-content:flex-end;
+}
+.btn{
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(124,92,255,0.55);
+  background: rgba(124,92,255,0.22);
+  color: var(--text);
+  cursor:pointer;
+}
+.btn:hover{ background: rgba(124,92,255,0.30); }
+.btn.secondary{
+  border-color: var(--stroke);
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+}
+.btn.secondary:hover{ background: rgba(255,255,255,0.10); color: var(--text); }
+
+.warn{
+  margin-top: 10px;
+  color: rgba(255,210,80,0.95);
+}
+/* LIVE (temps réel) */
+.live-panel{
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--stroke);
+}
+
+.live-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.live-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.live-row:last-child{
+  border-bottom: none;
+}
+
+/* (optionnel) petit feedback couleur du badge */
+#liveStatus{
+  color: var(--muted);
+}
+
+/* =========================
+   UI — AGRANDIR L’INTERFACE
+   (à coller à la fin)
+========================= */
+
+/* 1) Échelle globale (typographie plus lisible) */
+body{
+  font-size: 18px;
+}
+
+/* 2) Zone utile plus large */
+.topbar{
+  max-width: 1400px;
+  padding: 22px 22px;
+}
+.container{
+  max-width: 1400px;
+  padding: 0 22px 34px;
+  gap: 20px;
+}
+
+/* 3) Cartes plus “confort” */
+.card{
+  padding: 22px;
+  border-radius: 22px;
+}
+
+/* 4) Titres / textes */
+.title{ font-size: 22px; }
+.subtitle{ font-size: 14px; }
+
+h2{ font-size: 20px; }
+.hint{ font-size: 14px; }
+
+.badge{
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.status{
+  font-size: 14px;
+}
+
+.small, .tip, .mapping label{
+  font-size: 14px;
+}
+
+/* 5) Boutons contrôle plus gros */
+.controls{
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.ctrl-btn{
+  height: 104px;     /* avant 84 */
+  font-size: 34px;   /* avant 26 */
+  border-radius: 18px;
+}
+
+/* 6) Boutons icônes */
+.icon-btn{
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+}
+.gear{ font-size: 22px; }
+
+.logo{
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+}
+
+/* 7) Preview touches plus lisible */
+.keypill{
+  font-size: 14px;
+  padding: 10px 12px;
+}
+
+/* 8) Slider vitesse plus gros */
+.speed{
+  gap: 14px;
+}
+.speed-value{
+  font-size: 18px;
+  min-width: 70px;
+}
+
+/* 9) Live panel */
+.live-panel{
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 16px;
+}
+.live-head{
+  font-size: 16px;
+}
+.live-row{
+  padding: 10px 0;
+  font-size: 15px;
+}
+
+/* 10) Modal plus grande */
+.modal{
+  width: min(760px, calc(100vw - 24px));
+  border-radius: 22px;
+}
+.modal-header h3{
+  font-size: 18px;
+}
+.keybox{
+  min-width: 160px;
+  padding: 12px 14px;
+  font-size: 16px;
+}
+.btn{
+  padding: 12px 14px;
+  font-size: 16px;
+}
+
+/* 11) Mobile : on évite que ça déborde */
+@media (max-width: 900px){
+  body{ font-size: 17px; }
+  .container{ max-width: 100%; }
+  .ctrl-btn{ height: 96px; font-size: 32px; }
+}
+
+.top-actions{
+  display:flex;
+  gap: 10px;
+  align-items:center;
+}
